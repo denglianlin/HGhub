@@ -17,12 +17,12 @@ jobs:
     name: iOS unsigned IPA
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -97,9 +97,19 @@ jobs:
             exit 0
           fi
           # 否则从 .app 手工打包；archive 产物可能在 DerivedData/Archives 里
-          APP=$(find src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData ~/Library/Developer/Xcode/Archives -name "HGhub.app" -type d 2>/dev/null | head -1)
+          # 注意：.app 的名字不确定——tauri.conf.json 里 productName 是 HGhub，
+          # 但 Xcode 工程/目标叫 huangguo-client（见上次日志），产物可能是
+          # 其中任一个，所以先按两个名字优先找，找不到再取任意一个 .app。
+          APP=""
+          for name in HGhub.app huangguo-client.app; do
+            APP=$(find src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData ~/Library/Developer/Xcode/Archives -name "$name" -type d 2>/dev/null | head -1)
+            [ -n "${APP:-}" ] && break
+          done
           if [ -z "${APP:-}" ]; then
-            echo "找不到 HGhub.app，列出候选："
+            APP=$(find src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData ~/Library/Developer/Xcode/Archives -name "*.app" -type d 2>/dev/null | grep -v "/IntermediateBuildFilesPath/" | head -1)
+          fi
+          if [ -z "${APP:-}" ]; then
+            echo "找不到 .app，列出候选："
             find src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head
             exit 1
           fi
@@ -110,7 +120,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent Payload HGhub-unsigned.ipa
           ls -lh HGhub-unsigned.ipa
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: HGhub-ios-unsigned
           path: HGhub-unsigned.ipa
