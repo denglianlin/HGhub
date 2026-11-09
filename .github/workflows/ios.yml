@@ -1,0 +1,95 @@
+name: iOS (unsigned IPA)
+
+# 给没有 Mac 的个人用户出未签名 iOS 包，再用 AltStore / Sideloadly
+# 以自己的免费 Apple ID 签名装到 iPhone 上自用。
+# 用法：把本文件放进 fork 后的仓库 .github/workflows/ios.yml，
+# 在 GitHub 网页上 Actions -> iOS (unsigned IPA) -> Run workflow，
+# 跑完在 Artifacts 里下载 HGhub-ios-unsigned。
+#
+# 注意：本文件只在 GitHub 的 macOS runner 上跑，不用你本地有 Mac，
+# 也不需要任何 Apple 证书 / 密码 / secret。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    name: iOS unsigned IPA
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ios
+
+      - run: pnpm install --frozen-lockfile
+
+      # 仓库锁的是 @tauri-apps/cli 2.10.1，--no-sign 是 2.11 才有的参数；
+      # 只在 runner 里升到最新 2.x，不改仓库文件。
+      - name: 升级 Tauri CLI 到最新 2.x（为 --no-sign）
+        run: pnpm add -D @tauri-apps/cli@^2
+
+      - name: 准备 xcodegen（如 runner 未预装）
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+
+      - name: 生成 iOS 工程
+        run: pnpm tauri ios init --ci
+
+      # 生成器可能把部署目标写死成 14.0，新版 Xcode 不接受，改成 15.0
+      #（与仓库 tauri.ios.conf.json 里的 minimumSystemVersion 一致）。
+      - name: 修正部署目标（若生成器写死 14.0）
+        run: |
+          f=src-tauri/gen/apple/project.yml
+          if [ -f "$f" ]; then
+            sed -i '' '/IPHONEOS_DEPLOYMENT_TARGET/s/14\.0/15.0/' "$f" || true
+            grep -n "IPHONEOS_DEPLOYMENT_TARGET" "$f" || true
+          fi
+
+      # 生成器不读 src-tauri/icons/ios，AppIcon 会是占位图；把仓库里现成的
+      # iOS 图标拷过去覆盖。
+      - name: 换上仓库自带的 iOS 图标
+        run: |
+          ICONSET=$(find src-tauri/gen/apple -name "AppIcon.appiconset" -type d | head -1)
+          if [ -n "${ICONSET:-}" ]; then
+            cp src-tauri/icons/ios/AppIcon-*.png "$ICONSET/" 2>/dev/null || true
+            ls "$ICONSET" | head -5
+          else
+            echo "未找到 AppIcon.appiconset，跳过（将使用占位图标）"
+          fi
+
+      - name: 构建（不签名）
+        run: pnpm tauri ios build --no-sign --ci
+
+      - name: 打包成 .ipa
+        run: |
+          set -euo pipefail
+          APP=$(find src-tauri/gen/apple -name "HGhub.app" -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "找不到 HGhub.app，列出候选："
+            find src-tauri/gen/apple -name "*.app" -type d | head
+            exit 1
+          fi
+          echo "找到 $APP"
+          rm -rf Payload HGhub-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload HGhub-unsigned.ipa
+          ls -lh HGhub-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HGhub-ios-unsigned
+          path: HGhub-unsigned.ipa
+          if-no-files-found: error
