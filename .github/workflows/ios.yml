@@ -36,16 +36,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # 仓库锁的是 @tauri-apps/cli 2.10.1，--no-sign 是 2.11 才有的参数；
-      # 只在 runner 里升到最新 2.x，不改仓库文件。
-      - name: 升级 Tauri CLI 到最新 2.x（为 --no-sign）
-        run: pnpm add -D @tauri-apps/cli@^2
-
       - name: 准备 xcodegen（如 runner 未预装）
         run: command -v xcodegen >/dev/null || brew install xcodegen
 
+      # 注意：不要用 `pnpm add` 升级仓库锁定的 CLI——实测升级步虽然显示成功，
+      # 但真正跑起来的仍是仓库锁定的 2.10.1（它没有 --no-sign 参数）。
+      # 改为用 npx 指定精确版本 2.12.4（已核对源码，带 --no-sign），绕开仓库锁定的版本。
+      - name: 打印 Tauri CLI 版本（确认 --no-sign 可用）
+        run: npx -y @tauri-apps/cli@2.12.4 --version
+
       - name: 生成 iOS 工程
-        run: pnpm tauri ios init --ci
+        run: npx -y @tauri-apps/cli@2.12.4 ios init --ci
 
       # 生成器可能把部署目标写死成 14.0，新版 Xcode 不接受，改成 15.0
       #（与仓库 tauri.ios.conf.json 里的 minimumSystemVersion 一致）。
@@ -70,7 +71,7 @@ jobs:
           fi
 
       - name: 构建（不签名）
-        run: pnpm tauri ios build --no-sign --ci
+        run: npx -y @tauri-apps/cli@2.12.4 ios build --no-sign --ci
 
       - name: 打包成 .ipa
         run: |
