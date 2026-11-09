@@ -39,14 +39,26 @@ jobs:
       - name: 准备 xcodegen（如 runner 未预装）
         run: command -v xcodegen >/dev/null || brew install xcodegen
 
-      # 注意：不要用 `pnpm add` 升级仓库锁定的 CLI——实测升级步虽然显示成功，
-      # 但真正跑起来的仍是仓库锁定的 2.10.1（它没有 --no-sign 参数）。
-      # 改为用 npx 指定精确版本 2.12.4（已核对源码，带 --no-sign），绕开仓库锁定的版本。
-      - name: 打印 Tauri CLI 版本（确认 --no-sign 可用）
-        run: npx -y @tauri-apps/cli@2.12.4 --version
+      # 关键教训（已实测两次失败确认）：
+      # Xcode 构建阶段跑的是 `npm run tauri ios xcode-script`，即仓库
+      # node_modules 里的 CLI；而 2.10.1 与 2.12.x 传递构建参数的机制完全不同
+      #（2.10.1 用 $TMPDIR/<id>-server-addr 文件，2.12.x 用
+      # gen/apple/.tauri/cli-options-server.json）。父进程与子进程版本不一致
+      # 就会在 "failed to read missing addr file ...-server-addr" 处 panic、
+      # ARCHIVE FAILED。所以必须把本地 CLI 也统一到 2.12.4，并且打印版本号验证。
+      # 注意：之前用 `pnpm add @tauri-apps/cli@^2` 升级的那步虽然显示成功，
+      # 但实际跑起来的仍是 2.10.1，因此这里先 rm 再精确安装，并校验二进制版本。
+      - name: 统一本地 Tauri CLI 到 2.12.4（并校验版本）
+        run: |
+          pnpm rm @tauri-apps/cli || true
+          pnpm add -D @tauri-apps/cli@2.12.4 --save-exact
+          echo "package.json: $(node -p "require('./package.json').devDependencies['@tauri-apps/cli']")"
+          echo "node_modules 包版本: $(node -p "require('./node_modules/@tauri-apps/cli/package.json').version")"
+          pnpm exec tauri --version
+          test "$(pnpm exec tauri --version | grep -o '[0-9.]*' | head -1)" = "2.12.4" || (echo "本地 CLI 不是 2.12.4，停止" && exit 1)
 
       - name: 生成 iOS 工程
-        run: npx -y @tauri-apps/cli@2.12.4 ios init --ci
+        run: pnpm tauri ios init --ci
 
       # 生成器可能把部署目标写死成 14.0，新版 Xcode 不接受，改成 15.0
       #（与仓库 tauri.ios.conf.json 里的 minimumSystemVersion 一致）。
@@ -70,16 +82,25 @@ jobs:
             echo "未找到 AppIcon.appiconset，跳过（将使用占位图标）"
           fi
 
-      - name: 构建（不签名）
-        run: npx -y @tauri-apps/cli@2.12.4 ios build --no-sign --ci
+      - name: 构建（不签名，本地 CLI 与 Xcode 脚本同一版本）
+        run: pnpm tauri ios build --no-sign --ci
 
       - name: 打包成 .ipa
         run: |
           set -euo pipefail
-          APP=$(find src-tauri/gen/apple -name "HGhub.app" -type d | head -1)
-          if [ -z "$APP" ]; then
+          # CLI 自己可能已产出 .ipa，直接拿来用
+          IPA=$(find src-tauri/gen/apple -name "*.ipa" 2>/dev/null | head -1)
+          if [ -n "${IPA:-}" ]; then
+            echo "CLI 已产出 $IPA"
+            cp "$IPA" HGhub-unsigned.ipa
+            ls -lh HGhub-unsigned.ipa
+            exit 0
+          fi
+          # 否则从 .app 手工打包；archive 产物可能在 DerivedData/Archives 里
+          APP=$(find src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData ~/Library/Developer/Xcode/Archives -name "HGhub.app" -type d 2>/dev/null | head -1)
+          if [ -z "${APP:-}" ]; then
             echo "找不到 HGhub.app，列出候选："
-            find src-tauri/gen/apple -name "*.app" -type d | head
+            find src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head
             exit 1
           fi
           echo "找到 $APP"
