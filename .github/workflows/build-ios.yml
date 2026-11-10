@@ -1,0 +1,119 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+
+jobs:
+  ios:
+    name: iOS Build (IPA)
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      APPLE_DEVELOPMENT_TEAM: "ABCDE12345"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 对齐版本号
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          node -e "const fs=require('fs');for(const p of ['src-tauri/tauri.conf.json','package.json']){const j=JSON.parse(fs.readFileSync(p));j.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')}" "$V"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ios-build
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 初始化 iOS Xcode 工程
+        run: |
+          pnpm tauri ios init --ci
+          # 确保 iOS Info.plist（含 ~iphone / ~ipad 变体）支持横竖屏切换及 ATS
+          for plist in $(find src-tauri/gen/apple -name "Info.plist" 2>/dev/null); do
+            for key in "UISupportedInterfaceOrientations" "UISupportedInterfaceOrientations~iphone" "UISupportedInterfaceOrientations~ipad"; do
+              /usr/libexec/PlistBuddy -c "Delete :${key}" "$plist" 2>/dev/null || true
+              /usr/libexec/PlistBuddy -c "Add :${key} array" "$plist"
+              /usr/libexec/PlistBuddy -c "Add :${key}:0 string UIInterfaceOrientationPortrait" "$plist"
+              /usr/libexec/PlistBuddy -c "Add :${key}:1 string UIInterfaceOrientationLandscapeLeft" "$plist"
+              /usr/libexec/PlistBuddy -c "Add :${key}:2 string UIInterfaceOrientationLandscapeRight" "$plist"
+            done
+            /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$plist" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$plist"
+            /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$plist"
+          done
+        env:
+          APPLE_DEVELOPMENT_TEAM: "ABCDE12345"
+
+      - name: 构建 iOS 应用与打包 IPA
+        shell: bash
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.version }}
+        run: bash scripts/build-ios-unsigned.sh "$APP_VERSION"
+
+      - name: 上传 IPA 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: HGhub-iOS-IPA
+          path: artifacts/*
+          if-no-files-found: error
+
+      - name: 发布 iOS GitHub Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          TAG="v${V}-ios"
+          NOTES="## HGhub iOS 增强版 (v${V})
+
+          ### ✨ 核心特性
+          - **沉浸式竖屏刷剧流**：支持首页无限推荐流、题材分类、三大榜单（热门/推荐/潜力）、搜索、吃瓜社区图文与视频帖、选集与历史续播。
+          - **原生横竖屏智能切换**：横屏视频支持一键「横屏全屏」（调用 iOS 原生屏幕方向旋转），支持手机物理横置自动全屏、竖回自动退出，独立固定舞台层渲染不跑偏、不闪封面。
+          - **丰富触控手势**：
+            - **双指自由缩放（1x~4x）与平移**：竖屏观看横屏视频可自由缩放，并提供「放大铺满 / 完整适应 / 还原缩放」胶囊按钮；
+            - **单击清屏 / 双击暂停**：单击屏幕隐藏所有控件与遮罩纯享画面，双击屏幕暂停/播放；
+            - **长按 2.0x 倍速 + 上滑锁定**：长按画面开启 2.0x 倍速，上滑即可锁定倍速；
+            - **左右横滑预览定位**：任意位置横滑精准跳转进度。
+          - **HLS 播放稳定性加固**：内置 AES Key 与分片内存缓存、拖动进度条防卡死自愈重连、全屏旋转过渡期持续保活与片尾自动连播下一集。
+          - **多线路与镜像测速**：内置固定主备线路 + 自动抓取最新镜像域名 + 一键延迟测速切换。
+
+          ### 📲 安装说明（免证书生产包 \`.ipa\`）
+          1. **TrollStore（巨魔商店）**：下载 \`HGhub_${V}_ios.ipa\` 后直接导入巨魔永久安装。
+          2. **AltStore / SideStore / Sideloadly**：使用个人 Apple ID 自签安装。
+          3. **轻松签（ESign）/ 牛蛙助手 / Feather / 全能签**：导入证书签名后直接安装。"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/*.ipa --clobber
+            gh release edit "$TAG" --title "HGhub v${V} iOS 正式版" --notes "$NOTES" --prerelease=false --latest
+          else
+            gh release create "$TAG" artifacts/*.ipa \
+              --title "HGhub v${V} iOS 正式版" \
+              --notes "$NOTES" \
+              --latest
+          fi

@@ -430,7 +430,7 @@ fn edge_operation(path: &str) -> &'static str {
     let path = path.split('?').next().unwrap_or("");
     if path.starts_with("/api/videos/category/") {
         "category"
-    } else if path.starts_with("/api/videos/") && path.ends_with("/play") {
+    } else if path.starts_with("/api/videos/") && (path.ends_with("/play") || path.ends_with("/playback")) {
         "play"
     } else if path == "/api/videos" {
         "feed"
@@ -511,7 +511,9 @@ pub async fn edge(
     let operation = edge_operation(path);
     let mut attempt = 0;
     let guest_get = method.eq_ignore_ascii_case("GET") && body.is_none() && token.is_none();
-    let can_retry = method.eq_ignore_ascii_case("GET") && body.is_none();
+    // 取播放地址的 POST 没有副作用，和 GET 一样允许重试
+    let can_retry = (method.eq_ignore_ascii_case("GET") && body.is_none())
+        || (method.eq_ignore_ascii_case("POST") && operation == "play");
     let value = with_retry(can_retry, || {
         attempt += 1;
         let attempt = attempt;
@@ -700,6 +702,7 @@ mod tests {
             ("/api/videos?page=1&size=10", "feed"),
             ("/api/videos/category/private?x=secret", "category"),
             ("/api/videos/42/play?ep=1", "play"),
+            ("/api/videos/42/episodes/1/playback", "play"),
             ("/api/search?q=private-search", "search"),
             ("/api/account/loginByPassword", "account"),
             ("/unknown/private", "other"),

@@ -29,7 +29,7 @@ fn allowed_dev_host(host: &str) -> bool {
 fn allowed_frontend_origin(origin: &str) -> bool {
     if matches!(
         origin,
-        "tauri://localhost" | "http://tauri.localhost" | "https://tauri.localhost"
+        "tauri://localhost" | "http://tauri.localhost" | "https://tauri.localhost" | "null"
     ) {
         return true;
     }
@@ -121,6 +121,11 @@ pub fn run() {
                         .insert("Access-Control-Allow-Origin", origin);
                     resp.headers_mut()
                         .insert("Vary", tauri::http::HeaderValue::from_static("Origin"));
+                } else {
+                    resp.headers_mut().insert(
+                        "Access-Control-Allow-Origin",
+                        tauri::http::HeaderValue::from_static("*"),
+                    );
                 }
                 responder.respond(resp);
             });
@@ -140,6 +145,7 @@ pub fn run() {
             api::line_probe,
             api::check_update,
             api::open_url,
+            api::set_orientation,
             api::api_login,
             api::api_register,
             api::api_logout,

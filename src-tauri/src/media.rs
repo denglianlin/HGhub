@@ -30,9 +30,16 @@ static IMG_CACHE: Lazy<Mutex<HashMap<String, Arc<Vec<u8>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 static PL_CACHE: Lazy<Mutex<HashMap<String, Arc<String>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+static KEY_CACHE: Lazy<Mutex<HashMap<String, (String, Arc<Vec<u8>>)>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static SEG_CACHE: Lazy<Mutex<HashMap<String, (String, Arc<Vec<u8>>)>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 const IMG_CACHE_MAX: usize = 240;
 const PL_CACHE_MAX: usize = 60;
+const KEY_CACHE_MAX: usize = 120;
+const SEG_CACHE_MAX: usize = 36;
+const SEG_CACHE_MAX_BYTES: usize = 4 * 1024 * 1024;
 
 fn cache_put<V: Clone>(map: &Mutex<HashMap<String, V>>, key: String, val: V, max: usize) {
     let mut m = map.lock().unwrap();
@@ -184,9 +191,10 @@ fn rewrite_uri_attr(line: &str, prefix: &str) -> String {
     map_uri_attributes(line, |uri| format!("{prefix}/seg?u={}", enc(uri)))
 }
 
-/// 取 m3u8 并把 key / 分片地址改写到本地协议。
+/// 取 m3u8 并把 key / 子列表 / 分片地址改写到本地协议。
 pub async fn load_playlist(url: &str, prefix: &str) -> Result<Arc<String>, String> {
-    if let Some(hit) = PL_CACHE.lock().unwrap().get(url).cloned() {
+    let cache_key = format!("{prefix}|{url}");
+    if let Some(hit) = PL_CACHE.lock().unwrap().get(&cache_key).cloned() {
         return Ok(hit);
     }
     let (_, bytes) = fetch_bytes(url).await?;
@@ -195,7 +203,7 @@ pub async fn load_playlist(url: &str, prefix: &str) -> Result<Arc<String>, Strin
         return Err("响应不是 HLS 播放列表".into());
     }
     let arc = Arc::new(rewrite_playlist(url, text, prefix));
-    cache_put(&PL_CACHE, url.to_string(), arc.clone(), PL_CACHE_MAX);
+    cache_put(&PL_CACHE, cache_key, arc.clone(), PL_CACHE_MAX);
     Ok(arc)
 }
 
@@ -251,23 +259,54 @@ fn absolutize_uri_in_attr(base: &str, line: &str) -> String {
     map_uri_attributes(line, |uri| absolutize(base, uri))
 }
 
-/// 清空封面 / 播放列表内存缓存
+/// 加载分片或 AES Key（带内存缓存，避免拖动进度条时重复拉取同一 Key 或分片导致卡顿）。
+pub async fn load_segment(url: &str) -> Result<(Option<String>, Arc<Vec<u8>>), String> {
+    if let Some((ctype, hit)) = KEY_CACHE.lock().unwrap().get(url).cloned() {
+        return Ok((Some(ctype), hit));
+    }
+    if let Some((ctype, hit)) = SEG_CACHE.lock().unwrap().get(url).cloned() {
+        return Ok((Some(ctype), hit));
+    }
+    let (ctype, bytes) = fetch_bytes(url).await?;
+    let mime = ctype.clone().unwrap_or_else(|| {
+        let p = url.split('?').next().unwrap_or(url).to_ascii_lowercase();
+        if p.ends_with(".ts") {
+            "video/mp2t".to_string()
+        } else if p.ends_with(".m4s") || p.ends_with(".mp4") {
+            "video/mp4".to_string()
+        } else {
+            "application/octet-stream".to_string()
+        }
+    });
+    let len = bytes.len();
+    let arc = Arc::new(bytes);
+    if len <= 65536 {
+        cache_put(&KEY_CACHE, url.to_string(), (mime.clone(), arc.clone()), KEY_CACHE_MAX);
+    } else if len <= SEG_CACHE_MAX_BYTES {
+        cache_put(&SEG_CACHE, url.to_string(), (mime.clone(), arc.clone()), SEG_CACHE_MAX);
+    }
+    Ok((Some(mime), arc))
+}
+
+/// 清空封面 / 播放列表 / 分片内存缓存
 pub fn clear_caches() {
-    if let Ok(mut g) = IMG_CACHE.lock() {
-        g.clear();
-    }
-    if let Ok(mut g) = PL_CACHE.lock() {
-        g.clear();
-    }
+    if let Ok(mut g) = IMG_CACHE.lock() { g.clear(); }
+    if let Ok(mut g) = PL_CACHE.lock() { g.clear(); }
+    if let Ok(mut g) = KEY_CACHE.lock() { g.clear(); }
+    if let Ok(mut g) = SEG_CACHE.lock() { g.clear(); }
 }
 
 /* ───────────────────────── 协议响应 ───────────────────────── */
 
 fn respond(status: u16, ctype: &str, body: Vec<u8>, cache: &str) -> Response<Vec<u8>> {
+    let len = body.len().to_string();
     Response::builder()
         .status(StatusCode::from_u16(status).unwrap_or(StatusCode::OK))
         .header("Content-Type", ctype)
+        .header("Content-Length", len)
+        .header("Accept-Ranges", "bytes")
         .header("X-Content-Type-Options", "nosniff")
+        .header("Access-Control-Expose-Headers", "Content-Length, Content-Type, Accept-Ranges")
         .header("Cache-Control", cache)
         .body(body)
         .unwrap_or_else(|_| Response::new(Vec::new()))
@@ -350,8 +389,10 @@ pub async fn handle(path: &str, query: &str, origin: &str) -> Response<Vec<u8>> 
             ),
             Err(e) => respond(502, "text/plain", e.into_bytes(), "no-store"),
         },
-        "/seg" => match fetch_bytes(&target).await {
-            Ok((ctype, bytes)) => segment_response(&target, ctype.as_deref(), bytes, origin),
+        "/seg" => match load_segment(&target).await {
+            Ok((ctype, bytes)) => {
+                segment_response(&target, ctype.as_deref(), bytes.as_ref().clone(), origin)
+            }
             Err(e) => respond(502, "text/plain", e.into_bytes(), "no-store"),
         },
         _ => respond(404, "text/plain", b"not found".to_vec(), "no-store"),

@@ -57,6 +57,8 @@ export type PlayInfo = {
   title: string;
   video_url: string;
   video_url_hevc?: string;
+  /** 新版播放接口的字段；Rust 侧会把 main/hevc 回填到 video_url / video_url_hevc */
+  streams?: { main?: string; hevc?: string; preview?: string };
 };
 
 export type RankItem = {

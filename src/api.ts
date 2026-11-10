@@ -9,12 +9,16 @@ import type {
 export const APP_VERSION = __APP_VERSION__;
 
 const ua = navigator.userAgent;
-export const isAndroid = /Android/i.test(ua);
 /** iPhone 的 UA 也带「like Mac OS X」，必须先于 macOS 判断；iPadOS 默认伪装成 Mac，用触点数区分。 */
-export const isIos = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+export const isIos =
+  /iPhone|iPad|iPod/i.test(ua) ||
+  (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) ||
+  (typeof navigator.platform === "string" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+export const isAndroid = /Android/i.test(ua);
 export const isMacos = !isIos && /Macintosh|Mac OS X/i.test(ua);
-export const platform: "android" | "ios" | "windows" | "macos" =
-  isAndroid ? "android" : isIos ? "ios" : isMacos ? "macos" : "windows";
+export const isLinux = !isAndroid && !isIos && /Linux/i.test(ua);
+export const platform: "android" | "ios" | "windows" | "macos" | "linux" =
+  isAndroid ? "android" : isIos ? "ios" : isMacos ? "macos" : isLinux ? "linux" : "windows";
 /** 移动端（安卓 / iOS）共用触屏界面 */
 export const isMobile = isAndroid || isIos;
 
@@ -22,7 +26,7 @@ export const isMobile = isAndroid || isIos;
  *  Windows / Android → `http://<scheme>.localhost`
  *  macOS / iOS / Linux → `<scheme>://localhost`
  *  Rust 侧 `src-tauri/src/lib.rs` 里改写 m3u8 用的 scheme 必须与此一致。 */
-export const LOCAL = isMacos || isIos ? "hg://localhost" : "http://hg.localhost";
+export const LOCAL = isMacos || isIos || isLinux ? "hg://localhost" : "http://hg.localhost";
 
 /** src 是否已是本地协议地址（避免在详情页把代理地址再包一层） */
 export const isLocalMedia = (src: string) => src.startsWith(`${LOCAL}/`);

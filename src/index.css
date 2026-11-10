@@ -34,6 +34,7 @@
 }
 .plat-windows { --r-sm: 4px; --r-md: 8px; --r-lg: 8px; --r-ctl: 4px; --nav-h: 0px; }
 .plat-macos { --r-sm: 6px; --r-md: 10px; --r-lg: 12px; --r-ctl: 6px; --nav-h: 0px; }
+.plat-ios { --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-ctl: 999px; -webkit-touch-callout: none; }
 html.theme-light {
   color-scheme: light;
   --p-canvas: #f3f3f3;
@@ -152,7 +153,7 @@ html.theme-light .elev-3 { box-shadow: 0 10px 30px rgba(0,0,0,.1); }
 .a-panel-out { animation: kf-panel-out .2s ease-in both; }
 @keyframes kf-scale-in { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
 .a-scale-in { animation: kf-scale-in .22s cubic-bezier(.2,0,0,1) both; }
-@keyframes kf-page-in { from{transform:translateX(100%)} to{transform:translateX(0)} }
+@keyframes kf-page-in { from{transform:translateX(100%)} to{transform:none} }
 .a-page-in { animation: kf-page-in .3s cubic-bezier(.2,0,0,1) both; }
 @keyframes kf-page-out { from{transform:translateX(0)} to{transform:translateX(100%)} }
 .a-page-out { animation: kf-page-out .22s cubic-bezier(.3,0,.8,.15) both; }
@@ -250,7 +251,8 @@ input[type="range"].hg-range::-webkit-slider-thumb { -webkit-appearance: none; w
    原生全屏时红绿灯被系统隐藏（is-native-fs），让位收回，避免留一条空白。 */
 .plat-macos .win-titlebar { padding-left: 84px; }
 .plat-macos .win-titlebar.is-native-fs { padding-left: 14px; }
-.plat-android .win-main { background: var(--p-bg); overflow: hidden; }
+.plat-android .win-main,
+.plat-ios .win-main { background: var(--p-bg); overflow: hidden; }
 .win-page-in { animation: kf-page-in .26s cubic-bezier(.2,0,0,1) both; }
 .win-page-out { animation: kf-page-out .2s ease-in both; }
 
@@ -483,13 +485,28 @@ input[type="range"].hg-range::-webkit-slider-thumb { -webkit-appearance: none; w
 .player-surface .player-root,
 .player-root { background: #15181d; }
 
-/* —— 安卓沉浸全屏：横屏视频把舞台旋转 90°（不依赖系统旋转） —— */
+/* —— 移动端沉浸全屏：固定铺满全屏视口，脱离外层滚动容器 scrollTop 影响 —— */
+.fs-immersive {
+  position: fixed;
+  inset: 0;
+  width: 100vw; height: 100vh;
+  width: 100dvw; height: 100dvh;
+  z-index: 45;
+  background: #000;
+  overflow: hidden;
+}
+
+/* —— 移动端沉浸全屏（系统仍处于竖屏时的 CSS 90° 旋转兜底） —— */
 .fs-landscape {
-  position: absolute;
+  position: fixed;
   top: 50%; left: 50%; right: auto; bottom: auto;
   width: 100vh; height: 100vw;
+  width: 100dvh; height: 100dvw;
   transform: translate(-50%, -50%) rotate(90deg);
   transform-origin: center center;
+  z-index: 45;
+  background: #000;
+  overflow: hidden;
 }
 
 .desktop-dock-panel {

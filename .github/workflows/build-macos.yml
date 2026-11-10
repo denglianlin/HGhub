@@ -1,0 +1,147 @@
+name: Build macOS Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  macos:
+    name: macOS (${{ matrix.name }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            name: Apple Silicon (arm64)
+            arch: arm64
+          - target: x86_64-apple-darwin
+            name: Intel (x64)
+            arch: x64
+          - target: universal-apple-darwin
+            name: Universal (通用版)
+            arch: universal
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 对齐版本号
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          node -e "const fs=require('fs');for(const p of ['src-tauri/tauri.conf.json','package.json']){const j=JSON.parse(fs.readFileSync(p));j.version=process.argv[1];fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')}" "$V"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: macos-${{ matrix.target }}
+
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 构建 macOS 应用 (DMG + APP)
+        run: |
+          pnpm tauri build --config src-tauri/tauri.macos.conf.json --target ${{ matrix.target }}
+
+      - name: 整理构建产物
+        shell: bash
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          mkdir -p artifacts
+          
+          # 收集 dmg 安装包
+          found_dmg=0
+          for f in $(find src-tauri/target -name '*.dmg'); do
+            echo "发现 DMG: $f"
+            cp "$f" "artifacts/HGhub_${V}_${{ matrix.arch }}.dmg"
+            found_dmg=1
+          done
+          
+          # 打包 .app 绿色压缩包（便于不需要 DMG 安装的用户直接拖拽）
+          for app in $(find src-tauri/target -name 'HGhub.app' -type d); do
+            echo "发现 APP: $app"
+            tar -czf "artifacts/HGhub_${V}_${{ matrix.arch }}.app.tar.gz" -C "$(dirname "$app")" "HGhub.app"
+          done
+          
+          ls -lh artifacts/
+          if [ "$found_dmg" -eq 0 ]; then
+            echo "::error::未找到 DMG 构建产物"
+            exit 1
+          fi
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: HGhub-macOS-${{ matrix.arch }}
+          path: artifacts/*
+          if-no-files-found: error
+
+  publish-release:
+    name: 发布 GitHub Release
+    needs: [macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载所有 macOS 产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: 查看产物列表
+        run: ls -lh artifacts
+
+      - name: 获取版本号
+        id: ver
+        run: |
+          V="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}-macos
+          name: HGhub v${{ steps.ver.outputs.version }} macOS 专属版
+          body: |
+            ## HGhub macOS 编译发布版 (v${{ steps.ver.outputs.version }})
+
+            本项目为 [Minireel/HGhub](https://github.com/Minireel/HGhub) 官方源码针对 macOS 平台的编译产物。
+            原项目已在 PR #1 完成 macOS 适配支持，但官方尚未在 Release 页面发布 Mac 版产物。
+
+            ### 下载说明
+            - **Apple Silicon (M1/M2/M3/M4 系列芯片)**: 推荐下载 `HGhub_${{ steps.ver.outputs.version }}_arm64.dmg`
+            - **Intel 芯片**: 推荐下载 `HGhub_${{ steps.ver.outputs.version }}_x64.dmg`
+            - **通用双架构版 (全机型支持)**: 推荐下载 `HGhub_${{ steps.ver.outputs.version }}_universal.dmg`
+
+            ### macOS 首次打开说明（绕过未签名提示）
+            由于开源个人构建未购买苹果开发者企业证书签名与公证，首次打开若提示“已损坏”或“无法打开”，请在「终端」中执行以下命令清除隔离属性：
+            ```bash
+            sudo xattr -rd com.apple.quarantine /Applications/HGhub.app
+            ```
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false

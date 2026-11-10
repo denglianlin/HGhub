@@ -1,9 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { api, platform as envPlatform } from "./api";
 import { isStrictSecurity, setStrictSecurity as setHtmlStrictSecurity } from "./html";
 import type { User } from "./types";
 
-export type Platform = "android" | "ios" | "windows" | "macos";
+export type Platform = "android" | "ios" | "windows" | "macos" | "linux";
 export type Theme = "dark" | "light";
 export type Tab = "home" | "search" | "category" | "profile";
 
@@ -120,6 +121,8 @@ type Store = {
   toggleFollowLocal: (uid: number) => boolean;
   theater: boolean; setTheater: (v: boolean | ((p: boolean) => boolean)) => void;
   fs: boolean; setFs: (v: boolean | ((p: boolean) => boolean)) => void;
+  /** 清屏模式（单击屏幕消除所有控件，只保留纯视频内容） */
+  clean: boolean; setClean: (v: boolean | ((p: boolean) => boolean)) => void;
   muted: boolean; setMuted: (v: boolean | ((p: boolean) => boolean)) => void;
   muteOnStartup: boolean; setMuteOnStartup: (on: boolean) => void;
   volume: number; setVolume: (v: number) => void;
@@ -142,6 +145,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [theater, setTheaterState] = useState(false);
   const [fs, setFsState] = useState(false);
+  const [clean, setCleanState] = useState(false);
   const [strictSecurity, setStrictSecurityState] = useState<boolean>(isStrictSecurity);
   const [cliRelaxed, setCliRelaxed] = useState(false);
   const [strictSecurityReady, setStrictSecurityReady] = useState(false);
@@ -189,11 +193,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2200);
   }, []);
 
-  const setTab = useCallback((t: Tab) => { setTabRaw(t); setStack([]); }, []);
+  const setTab = useCallback((t: Tab) => { setTabRaw(t); setStack([]); setCleanState(false); }, []);
   const push = useCallback((pg: PageInput) => {
+    setCleanState(false);
     setStack((s) => [...s, { ...pg, key: `p${++seq}` } as Page]);
   }, []);
-  const pop = useCallback(() => setStack((s) => s.slice(0, -1)), []);
+  const pop = useCallback(() => {
+    setCleanState(false);
+    setStack((s) => s.slice(0, -1));
+  }, []);
 
   const toggleLikeLocal = useCallback((id: number) => {
     let on = false;
@@ -253,7 +261,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setFs = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
-    setFsState((prev) => (typeof v === "function" ? (v as (p: boolean) => boolean)(prev) : v));
+    setFsState((prev) => {
+      const next = typeof v === "function" ? (v as (p: boolean) => boolean)(prev) : v;
+      if (!next) {
+        invoke("set_orientation", { landscape: false }).catch(() => {});
+        try { screen.orientation?.unlock?.(); } catch { /* ignore */ }
+      }
+      return next;
+    });
+  }, []);
+
+  const setClean = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setCleanState((prev) => (typeof v === "function" ? (v as (p: boolean) => boolean)(prev) : v));
   }, []);
 
   const setMuted = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
@@ -276,7 +295,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isLiked: (id) => p.likes.includes(id),
     isFav: (id) => p.favs.includes(id),
     toggleLikeLocal, toggleFavLocal, toggleFollowLocal, addHistory, clearHistory,
-    muted: p.muted, setMuted, volume: p.volume, setVolume, theater, setTheater, fs, setFs,
+    muted: p.muted, setMuted, volume: p.volume, setVolume,
+    theater, setTheater, fs, setFs, clean, setClean,
     muteOnStartup: p.muteOnStartup, setMuteOnStartup,
     searchHist: p.searchHist, addSearch, clearSearchHist,
     strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity,
@@ -284,7 +304,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }), [theme, tab, setTab, stack, push, pop, user, loginOpen, logout,
     p, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, addHistory, clearHistory,
     setMuted, setMuteOnStartup, setVolume, addSearch, clearSearchHist, strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity,
-    toasts, toast, theater, setTheater, fs, setFs]);
+    toasts, toast, theater, setTheater, fs, setFs, clean, setClean]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

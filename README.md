@@ -1,182 +1,79 @@
-*关于本项目：HGhub 只是我体验 Tuari2 移动端开发时做的小玩具，开源几天后不知为何收到了大量star。*
-
-*意识到可能存在的潜在危险后，我立刻更换了开源协议为 **PolyForm Noncommercial 1.0.0** ，并在 Readme 中写入了大量保护自己的文段。目前 HGhub收到的star实际上德不配位。*
-
-*在之后的更新中，我不再会维护任何获取上游数据的工作，维护方向将偏重于 UI/UX 与使用体验，同时仍会低频率的响应 PR 与 Issues。如果版权方或其授权代表认为本项目涉及其合法权益，欢迎通过 GitHub 仓库留言联系。收到明确的权利方通知后，我会第一时间积极响应，并根据对方诉求立即归档项目或将仓库转为私有，停止公开访问。*
-
-
-<div align="center">
-
 # HGhub
 
-**黄果短剧第三方客户端 · Rust + Tauri 2**
+**基于 Rust 与 Tauri 2 的跨平台界面与交互实践项目。**
 
-Windows / macOS / Android 三端 · Fluent 设计 · 沉浸式竖屏播放
+HGhub 起源于个人对 Tauri 2 和移动端开发的学习与尝试。感谢大家的关注与贡献；项目由个人利用业余时间维护，关注度的增长不会改变维护范围，也不代表服务或支持承诺。
 
-</div>
+## 维护范围与社区反馈
 
-> ⚠️ 本项目仅供 **学习与技术交流**，不提供、不存储、不分发任何音视频内容。
-> 所有内容均来自第三方站点，版权归原作者与上游站点所有。
+维护者本人后续仅主动维护 **UI/UX、交互细节与用户体验**，不再主动跟进上游数据获取、解析或播放链路适配，不承诺外部接口及相关功能持续可用。
 
-**使用须知**
+**任何主题的 PR 与 Issues 均可提交。**维护者会根据时间与精力低频阅读、酌情响应，并逐项决定是否处理或合并。提交不代表一定获得回复或被采纳；接受某次社区贡献，也不代表维护者恢复该方向的主动开发或承担持续适配承诺。
 
-- **以访客身份正常使用**：像普通访客一样浏览就好，请勿滥用本项目。
-- **不要给上游增加压力**：本项目本身不提供下载功能，请勿改动代码去做批量下载 / 批量抓取，也不要高频轮询、并发轰炸接口或挂机刷播放量；内置的封面与播放列表缓存请不要改小或关掉。
-- **尊重上游版权**：不要去除水印与站点标识，不要把剧集搬运、转码、修改后二次分发到别处（网盘、资源站、其他 App 等），更不能改完拿出去出售。
-- **不要公开传播接口与直链**：接口地址、播放直链、解密方式请勿公开张贴或打包成「资源站」——上游一旦封禁，所有人都没法再用。
-- **不要商业化**：禁止打包出售、接入广告 / 会员 / 付费点播，或作为收费服务的一部分分发（详见 [LICENSE](LICENSE)）。
-- **合理使用**：仅供个人学习、研究与自用；请在 24 小时内删除相关资源，并支持正版。
-- **遵守当地法律**：使用者应自行判断并承担合规责任。
+本说明用于交代维护者的工作范围与支持边界，不构成对其他开发者的维护要求，也不代表维护者为第三方贡献、修改版或独立项目提供持续担保。
 
-> ⚖️ 许可证自 v1.1.0 版本起改为 **PolyForm Noncommercial 1.0.0**：**禁止任何商业用途**——
-> 包括打包出售、接入付费/会员/广告变现、作为收费产品或服务的一部分分发。
-> 个人学习、研究、自用与非营利使用不受限制，详见 [LICENSE](LICENSE)。
+## 非商业立场
 
+本项目采用 [PolyForm Noncommercial 1.0.0](LICENSE)，**禁止任何商业用途**，包括销售、广告变现、卡密、VIP、付费解锁，以及作为收费产品或服务的一部分使用；具体授权范围以许可证全文为准。
 
-## 官方渠道与仿冒提醒
+维护者**不提供商业授权，不接受任何广告、推广、商务合作或其他合作洽谈**，也未授权任何个人或组织以维护者或本项目名义收费、招揽业务。社区技术贡献与问题反馈不属于商务合作。
 
-- **唯一官方仓库**：[github.com/Minireel/HGhub](https://github.com/Minireel/HGhub)
-- **唯一下载渠道**：[GitHub Releases](https://github.com/Minireel/HGhub/releases)。仓库源码页不放任何可执行文件，
-  其余网站、网盘、QQ 群、公众号、第三方下载站分发的「HGhub」安装包**一律非官方**，作者不保证其安全性与完整性。
+## 项目说明与责任边界
 
-> 🚫 **已发现的恶意修改版**：[`hichuv/HGhub`](https://github.com/hichuv/HGhub)
->
-> 该仓库与本项目无关，是在旧版本源码基础上擅自加入**卡密验证、VIP 付费解锁**等变现功能的修改版，
-> 代码改动不透明、安全性无法验证。**请勿下载、勿注册、勿付费**；如已安装，建议立即卸载，改用官方 Release 包安装。
->
-> 本项目**从未、也不会**加入任何卡密 / VIP / 付费解锁 / 广告功能。如果你遇到的「HGhub」要求输入卡密或付费开通，那一定不是官方版本。
+- 本仓库记录个人技术实践，包含界面、播放、网络请求等实现。维护者不运营内容托管服务，不参与外部音视频内容的制作、上传或经营。
+- 项目与外部站点、内容提供者及其权利方不存在官方隶属、代理或背书关系。涉及第三方内容、名称或标识时，相关权利仍归各自权利人；代码公开不代表已取得这些内容的使用或传播授权。
+- 软件按现状提供。在适用法律允许的范围内，维护者不保证其完整性、准确性、安全性、适用性或持续可用性，也不承诺修复、更新或响应期限。
+- 第三方修改、分发、宣传或经营行为不代表维护者的意见或授权；维护者无法控制独立副本及其后续行为。本项目的信息以[本仓库](https://github.com/Minireel/HGhub)的公开记录为准。
+- 以上说明用于澄清项目性质、维护范围与授权边界，不替代适用法律，也不排除依法应承担的责任。软件许可证仅涉及相应代码权利，不构成对第三方内容或服务的授权。
 
+## 官方通知与权益反馈
 
-## 技术栈
+维护者尊重各方合法权益，**将积极响应来自上游、GitHub 平台、版权方及其授权代表、有关机构或公众组织的正式通知与合理关切**。此类事项不适用普通功能反馈的低频处理安排。
 
-| 层 | 选型 |
+可通过 [GitHub Issues](https://github.com/Minireel/HGhub/issues)或平台正式渠道联系，说明相关主体、涉及内容、具体诉求及可核实依据。涉及个人信息或非公开材料时，可先提出联系请求，再协商适当的沟通方式。
+
+收到通知后，维护者会尽快核实、沟通并配合处理，视具体情况采取修改或移除相关内容、暂停相关功能、停止维护、归档或调整仓库可见性等措施。处理范围限于维护者能够控制的仓库和渠道，不承诺控制已独立分发的副本。
+
+## 技术与目录
+
+| 层 | 技术 |
 | --- | --- |
-| 壳 | Tauri 2（Rust 1.90+） |
-| 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS 4 |
-| 播放 | hls.js（HLS / AES-128） |
-| 网络 | reqwest + rustls |
+| 应用框架 | Rust、Tauri 2 |
+| 界面 | React、TypeScript、Vite、Tailwind CSS |
+| 播放组件 | hls.js |
+| 网络 | reqwest、rustls |
 
-## 目录
-
-```
-.
-├─ src/                      前端
-│  ├─ api.ts                 接口封装 + 本地媒体协议 URL
-│  ├─ store.tsx              全局状态（导航栈 / 用户 / 本地收藏 / 主题）
-│  ├─ html.ts                吃瓜正文清洗与图片代理
-│  ├─ components/            Feed（播放页）/ VideoSurface / PlayerControls / Panels / UI
-│  └─ pages/                 Home / Search / Category / Profile / Posts
-├─ src-tauri/                Rust 后端
-│  └─ src/
-│     ├─ net.rs              请求层（边缘信封 + 重试）
-│     ├─ api.rs              业务命令
-│     ├─ media.rs            封面解密 + HLS 代理 + 缓存
-│     └─ session.rs          token 持久化
-└─ docs/API.md               接口文档
+```text
+src/                    界面、交互、状态管理与组件
+src-tauri/              原生能力与 Rust 实现
+scripts/                开发、构建与验证脚本
+tests/                  本地测试页面与回归用例
+docs/                   技术说明与维护记录
 ```
 
-## 开发 / 构建
+## 本地开发
+
+基础环境：Node.js 22、pnpm 10、Rust 1.90 或更高版本，以及目标平台所需的 Tauri 开发环境。
 
 ```bash
-pnpm install          # 首次安装
-pnpm app:dev          # 桌面端热重载
-pnpm app:build        # 打包：Windows → NSIS 安装程序；macOS → .app + .dmg
+pnpm install --frozen-lockfile
+pnpm dev             # 前端开发
+pnpm app:dev         # 桌面应用开发
+pnpm build           # 类型检查与前端构建
 ```
 
-macOS 先装 Xcode Command Line Tools（`xcode-select --install`），打包目标写在
-`src-tauri/tauri.macos.conf.json`（`app` + `dmg`，窗口用系统标题栏 Overlay）。
+各平台配置位于 `src-tauri/tauri*.conf.json`。移动端及 macOS 开发需要相应平台的 SDK 和工具链。
 
-Android（需 Android SDK + NDK，并配置 `ANDROID_HOME` / `NDK_HOME`）：
+- exFAT 等不支持符号链接的文件系统需保留 `.npmrc` 中的 `node-linker=hoisted`；部分原生构建步骤仍可能受文件系统限制。
+- 依赖安装脚本的允许列表见 `package.json` 与 `pnpm-workspace.yaml`。
+- 内容处理、网络安全边界与本地回归说明见[客户端内容与网络安全](docs/security.md)。
 
-```bash
-pnpm android:init     # 首次生成 android 工程
-pnpm android:dev      # 真机 / 模拟器调试
-pnpm android:build    # 产出 APK
-```
+## 许可证
 
-iOS（需 Xcode、xcodegen、CocoaPods 与 Apple 开发者账号；自行签名安装到自己的设备）：
+当前版本适用 [PolyForm Noncommercial License 1.0.0](LICENSE)。本页说明不替代许可证全文，也不另行增加用户或开发者行为规范。
 
-```bash
-export APPLE_DEVELOPMENT_TEAM=<你的 Team ID>
-pnpm tauri ios init --ci                          # 首次生成 Xcode 工程（src-tauri/gen/apple）
-pnpm tauri ios build --export-method debugging    # 产出 src-tauri/gen/apple/build/arm64/HGhub.ipa
-xcrun devicectl device install app --device <UDID> <解压后的 Payload/HGhub.app>
-```
+历史版本 v1.0.1 及更早版本曾以 MIT 许可证发布，已取得的相应授权不因后续换证而撤回；自 v1.1.0 起的新版本适用 PolyForm Noncommercial 1.0.0。
 
-最低系统版本写在 `src-tauri/tauri.ios.conf.json`（iOS 15）。iOS 复用安卓的触屏界面；自定义协议与 macOS 相同，为 `hg://localhost`。
+## 社区
 
-### 环境注意
-
-- 工程若放在 **exFAT** 盘（不支持符号链接），需保留 `.npmrc` 中的 `node-linker=hoisted`。
-- pnpm 10 靠 `package.json` 的 `pnpm.onlyBuiltDependencies` 放行 `esbuild`，否则 `vite build` 缺少二进制；
-  pnpm 11 起该字段失效，白名单改在 `pnpm-workspace.yaml` 的 `allowBuilds`（两处都保留）。
-
-## 实现要点
-
-「设置 → 播放 → 启动时静音」默认开启，每次启动应用均静音，播放时可手动开启声音。关闭此选项后，下次启动恢复上次的静音状态；音量仍会记忆。
-
-安全加固后的正文处理、FakeIP/内网限制、账号线路隔离及本地回归方法，见 [客户端内容与网络安全](docs/security.md)。镜像线路仅支持游客浏览，跨站点切换和首次升级后需要重新登录。
-
-Mihomo 与 sing-box 分流规则、已知域名统计及导入方法，见 [网络分流规则](rules/README.md)。
-
-1. **统一边缘信封**：站点把 `/api/**` 收敛为 `POST /api/edge/request`（`method/path/body(base64)/content_type` + `Authorization: Bearer`），本项目只对接这一个入口，无需处理 Cookie。
-2. **封面解密**：封面为 AES-128-CBC 密文，Rust 侧解密后经自定义协议输出，前端 `<img>` 直接使用。
-3. **HLS 代理**：m3u8 与分片经自定义协议转发并改写 `#EXT-X-KEY` / 分片地址，绕开 WebView 的 CORS 与防盗链。
-4. **自定义协议**：Windows / Android 为 `http://hg.localhost/*`，macOS 为 `hg://localhost/*`（Tauri 的平台差异）。
-   Rust 侧 `lib.rs` 与前端 `api.ts` 各自按平台生成一次基址，两处必须一致，否则封面与视频全部加载失败。
-5. **不做签名逆向**：只复用浏览器同源行为，接口字段均有文档与实测样本。
-
-
-## 免责声明
-
-- 本项目与内容提供方无任何关联，作者不参与内容的制作、上传与分发。
-- 本项目仅在上述官方渠道发布；任何第三方修改版（尤其是加卡密、VIP 变现的版本）均与作者无关，请自行甄别。
-- 使用者应自行遵守所在地法律法规；因使用本项目产生的任何后果由使用者自行承担。
-- 若相关权利方认为本项目存在侵权，请通过 Issue 联系，我们会及时处理。
-
-## License
-
-[PolyForm Noncommercial License 1.0.0](LICENSE) —— **仅限非商业用途**。
-
-- **允许**：个人学习、研究、自用、爱好项目，以及在非营利组织内部使用；可以自由修改、二次开发。
-- **禁止**：任何商业用途。包括但不限于打包出售、接入付费/会员/广告变现、作为收费服务或商业产品的一部分分发。
-- **保留声明**：分发本项目或其修改版时，必须附带本许可证全文（或上面的链接）以及 `Required Notice` 声明行。
-- 商业授权请通过 Issue 联系作者单独洽谈。
-
-> 历史说明：v1.0.1 及更早版本以 MIT 发布，已发出的副本继续按 MIT 授权；自 **v1.1.0** 起的新版本一律适用 PolyForm Noncommercial 1.0.0。
-
-## 常见问题
-
-**1. `pnpm install` 报 `ERR_PNPM_EISDIR ... symlink`**
-
-工程放在 exFAT / FAT32 盘时无法创建符号链接，保留 `.npmrc` 里的 `node-linker=hoisted` 即可。
-
-**2. `tauri android build` 报 `Failed to create a symbolic link ... jniLibs`**
-
-同样是 exFAT 不支持符号链接。可手动把 Rust 产物拷进 jniLibs，再直接跑 Gradle：
-
-```bash
-cp src-tauri/target/aarch64-linux-android/debug/libhuangguo_client_lib.so \
-   src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/
-
-cd src-tauri/gen/android
-./gradlew assembleDebug        # Windows: gradlew.bat assembleDebug
-```
-
-产物在 `src-tauri/gen/android/app/build/outputs/apk/`。
-
-**3. Android 构建提示找不到 SDK / NDK**
-
-需要设置 `ANDROID_HOME`（Android SDK 根目录）、`NDK_HOME`（`$ANDROID_HOME/ndk/<版本>`）与 `JAVA_HOME`（JDK 17）。
-
-**4. macOS 打开时提示「已损坏」或「无法验证开发者」**
-
-Release 里的 dmg 没有用 Apple 开发者证书签名和公证，从网上下载后会被 Gatekeeper 拦下。
-把 HGhub 拖进「应用程序」后，在终端执行一次：
-
-```bash
-xattr -cr /Applications/HGhub.app
-```
-
-## LinuxDO
-https://linux.do/
+[Linux.DO](https://linux.do/)
