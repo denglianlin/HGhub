@@ -131,10 +131,10 @@ export default function Player({
         else { hls.destroy(); hlsRef.current = null; }
       });
     } else {
-      // Safari / 部分 WebView 原生支持 HLS
-      video.src = url;
-      if (autoPlay) activity.play("native_autoplay", true);
-    }
+  // Safari / 部分 WebView 原生支持 HLS：直接给源站地址（同 VideoSurface）。
+  video.src = /^https?:\/\//i.test(src) ? src : url;
+  if (autoPlay) activity.play("native_autoplay", true);
+}
 
     return () => {
       trace("source.cleanup");
