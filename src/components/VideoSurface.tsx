@@ -274,10 +274,12 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
           hlsRef.current = null;
         }
       });
-    } else {
-      video.src = url;
-      if (autoPlay) activity.play("native_autoplay", true);
-    }
+   } else {
+  // 无 MSE（如 iOS 17.0）走原生播放器：直接给源站地址。
+  // 原生播放器不受 WebView CORS 限制，绕开 hg:// 自定义协议。
+  video.src = /^https?:\/\//i.test(src) ? src : url;
+  if (autoPlay) activity.play("native_autoplay", true);
+}
 
     return () => {
       trace("source.cleanup");
