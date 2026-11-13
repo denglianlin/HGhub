@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { fmtTime, platform, playlist } from "../api";
+import { fmtTime, localProxyPlaylist, platform, playlist } from "../api";
 import { mediaResource, observeHls, usePlayerDiagnostics } from "../playbackDiagnostics";
 import { usePlaybackActivity } from "../usePlaybackActivity";
 import { useSeekInput } from "../useSeekInput";
@@ -61,6 +61,7 @@ export default function Player({
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
+    let cancelled = false;
     const url = playlist(src);
     recoverCountRef.current = 0;
     setErrMsg("");
@@ -132,12 +133,18 @@ export default function Player({
         else { hls.destroy(); hlsRef.current = null; }
       });
     } else {
-      // Safari / 部分 WebView 原生支持 HLS：直接给源站地址（同 VideoSurface）。
-      video.src = /^https?:\/\//i.test(src) ? src : url;
-      if (autoPlay) activity.play("native_autoplay", true);
+      // Safari / 部分 WebView 原生支持 HLS：经本机 HTTP 代理取清单（同 VideoSurface）。
+      // 源站清单是 text/plain，原生播放器拒收会报 code=4；代理以正确类型重发。
+      const raw = /^https?:\/\//i.test(src) ? src : url;
+      localProxyPlaylist(raw).then((proxied) => {
+        if (cancelled || videoRef.current !== video) return;
+        video.src = proxied;
+        if (autoPlay) activity.play("native_autoplay", true);
+      });
     }
 
     return () => {
+      cancelled = true;
       trace("source.cleanup");
       if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     };
