@@ -17,6 +17,7 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
   const [lineBase, setLineBase] = useState("");
   const [checking, setChecking] = useState(false);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [diag, setDiag] = useState<string | null>(null);
   const playbackLog = usePlaybackLog();
   const [copyingLog, setCopyingLog] = useState(false);
 
@@ -136,13 +137,14 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
                 label="严格安全模式"
               />
             </div>
-            {/* 打不开时先点这里：把 DNS / 代理 / HTTP 结果复制给维护者 */}
+            {/* 诊断用：结果直接弹窗显示（iOS 的 WKWebView 拦剪贴板，复制走不通，之前点了什么都不出来） */}
             <button onClick={async () => {
               try {
                 const text = JSON.stringify(await api.netDiag(), null, 2);
                 logLine(`[net_diag] ${text}`);
-                await navigator.clipboard?.writeText(text);
-                toast("网络诊断结果已复制", "ok");
+                setDiag(text);
+                await navigator.clipboard?.writeText(text).catch(() => {});
+                toast("网络诊断结果已显示", "ok");
               } catch (e) {
                 toast((e as Error).message || "诊断失败", "info");
               }
@@ -292,6 +294,14 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
             }} className="flex-1 h-9 rounded-(--r-ctl) bg-primary text-[12.5px] font-semibold text-on-primary pressable">前往下载</button>
           </div>
           <div className="text-[10px] text-dim mt-2.5 break-all">{update?.url}</div>
+        </div>
+      </Modal>
+
+      <Modal open={diag !== null} onClose={() => setDiag(null)} width={420}>
+        <div className="p-5">
+          <div className="text-[15px] font-bold text-on">网络诊断</div>
+          <pre className="mt-3 max-h-[320px] scroll-y rounded-(--r-sm) bg-s2 p-3 text-[11px] text-mut whitespace-pre-wrap break-all">{diag}</pre>
+          <button onClick={() => setDiag(null)} className="mt-4 w-full h-9 rounded-(--r-ctl) bg-s3 text-[12.5px] text-on pressable">知道了</button>
         </div>
       </Modal>
     </div>
