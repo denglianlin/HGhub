@@ -4,9 +4,10 @@ import type Hls from "hls.js";
 /** Keep asynchronous autoplay and error recovery subject to the latest page activity. */
 export function usePlaybackActivity(
   videoRef: RefObject<HTMLVideoElement | null>, hlsRef: RefObject<Hls | null>,
-  { active, autoPlay, src, trace }: { active: boolean; autoPlay: boolean; src: string; trace: (event: string, data?: Record<string, unknown>) => void },
+  { active, autoPlay, src, trace, onPlayRejected }: { active: boolean; autoPlay: boolean; src: string; trace: (event: string, data?: Record<string, unknown>) => void; onPlayRejected?: (source: string, errorName: string) => void },
 ) {
   const latest = useRef({ active, trace }); latest.current = { active, trace };
+  const rejectedRef = useRef(onPlayRejected); rejectedRef.current = onPlayRejected;
   const wanted = useRef(autoPlay);
   const mounted = useRef(true);
   const previous = useRef(active);
@@ -26,7 +27,11 @@ export function usePlaybackActivity(
     v.play().then(() => {
       // The page may have changed while play() was pending.
       if (!mounted.current || !latest.current.active) v.pause();
-    }).catch(e => latest.current.trace("play.rejected", { source, error_name: e?.name }));
+    }).catch(e => {
+      latest.current.trace("play.rejected", { source, error_name: e?.name });
+      // 诊断用：只把用户手动触发的 play() 拒绝显示出来，自动播放被拒是常见情况、不弹。
+      if (!automatic) rejectedRef.current?.(source, e?.name ?? "unknown");
+    });
   }, []);
   const pause = useCallback((source = "handle") => {
     wanted.current = false;
