@@ -1,6 +1,6 @@
 import React, { useEffect, useImperativeHandle, useRef, forwardRef, useState } from "react";
 import Hls from "hls.js";
-import { isLocalMedia, platform, playlist } from "../api";
+import { isLocalMedia, localProxyPlaylist, platform, playlist } from "../api";
 import { mediaResource, observeHls, usePlayerDiagnostics } from "../playbackDiagnostics";
 import { usePlaybackActivity } from "../usePlaybackActivity";
 
@@ -156,6 +156,7 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
+    let cancelled = false;
     setReady(false);
     recoverCountRef.current = 0;
     lastSizeRef.current = { w: 0, h: 0 };
@@ -276,13 +277,19 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
         }
       });
     } else {
-      // 无 MSE（如 iOS 17.0）走原生播放器：直接给源站地址。
+      // 无 MSE（如 iOS 17.0）走原生播放器：经本机 HTTP 代理取清单。
+      // 源站清单是 text/plain，原生播放器拒收会报 code=4；代理以正确类型重发。
       // 原生播放器不受 WebView CORS 限制，绕开 hg:// 自定义协议。
-      video.src = /^https?:\/\//i.test(src) ? src : url;
-      if (autoPlay) activity.play("native_autoplay", true);
+      const raw = /^https?:\/\//i.test(src) ? src : url;
+      localProxyPlaylist(raw).then((proxied) => {
+        if (cancelled || videoRef.current !== video) return;
+        video.src = proxied;
+        if (autoPlay) activity.play("native_autoplay", true);
+      });
     }
 
     return () => {
+      cancelled = true;
       trace("source.cleanup");
       if (recoverTimerRef.current) {
         window.clearTimeout(recoverTimerRef.current);
