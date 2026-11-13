@@ -61,7 +61,8 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
   const lastSizeRef = useRef({ w: 0, h: 0 });
   const [ready, setReady] = useState(false);
   const { trace, requestSeek } = usePlayerDiagnostics(videoRef, hlsRef, { ...diagnosticContext, active, resource: mediaResource(src) });
-  const activity = usePlaybackActivity(videoRef, hlsRef, { active, autoPlay, src, trace });
+  const activity = usePlaybackActivity(videoRef, hlsRef, { active, autoPlay, src, trace,
+    onPlayRejected: (source, name) => onError?.(`play() 被拒 ${name}（${source}）`) });
 
   const reportSizeAndDuration = (v: HTMLVideoElement) => {
     if (v.duration && Number.isFinite(v.duration) && v.duration > 0) {
@@ -274,12 +275,12 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
           hlsRef.current = null;
         }
       });
-   } else {
-  // 无 MSE（如 iOS 17.0）走原生播放器：直接给源站地址。
-  // 原生播放器不受 WebView CORS 限制，绕开 hg:// 自定义协议。
-  video.src = /^https?:\/\//i.test(src) ? src : url;
-  if (autoPlay) activity.play("native_autoplay", true);
-}
+    } else {
+      // 无 MSE（如 iOS 17.0）走原生播放器：直接给源站地址。
+      // 原生播放器不受 WebView CORS 限制，绕开 hg:// 自定义协议。
+      video.src = /^https?:\/\//i.test(src) ? src : url;
+      if (autoPlay) activity.play("native_autoplay", true);
+    }
 
     return () => {
       trace("source.cleanup");
@@ -348,6 +349,14 @@ const VideoSurface = forwardRef<VideoHandle, Props>(function VideoSurface(
           setReady(true);
           reapply(v);
           reportSizeAndDuration(v);
+        }}
+        onError={(e) => {
+          // 诊断用：原生播放器加载失败以前是静默的（无任何提示），code: 1=中断 2=网络 3=解码 4=地址不支持
+          const v = e.target as HTMLVideoElement;
+          const code = v.error?.code;
+          if (code && code !== 1) {
+            onError?.(`原生加载失败 code=${code}${v.error?.message ? ` ${v.error.message}` : ""}`);
+          }
         }}
         onCanPlay={(e) => {
           const v = e.target as HTMLVideoElement;
