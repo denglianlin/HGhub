@@ -2,8 +2,6 @@ name: Build macOS Release
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
 
 jobs:
   macos:
