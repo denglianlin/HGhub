@@ -38,6 +38,19 @@ export const cover = (url?: string, _w = 480) =>
 /** 播放列表：经本地协议改写分片地址，规避 CORS 与防盗链。 */
 export const playlist = (url: string) => `${LOCAL}/hls?u=${encodeURIComponent(url)}`;
 
+/** 本机 HTTP 代理的播放清单地址：原生播放器（iOS 17.0 无 MSE）经 127.0.0.1 取流。
+ *  源站清单是 text/plain，原生播放器拒收会报 code=4；代理以正确类型重发。
+ *  代理不可用时返回原地址，播放行为退回现状。 */
+export const localProxyPlaylist = async (url: string): Promise<string> => {
+  if (!/^https?:\/\//i.test(url)) return url;
+  try {
+    const proxied = await invoke<string>("proxy_play_url", { src: url });
+    return typeof proxied === "string" && proxied ? proxied : url;
+  } catch {
+    return url;
+  }
+};
+
 /* ── 调用封装 ───────────────────────────────────────────── */
 
 /** 写一行到应用数据目录 debug.log（用户反馈「打不开」时要的就是它） */
