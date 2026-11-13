@@ -32,7 +32,8 @@ export default function Player({
   const hlsRef = useRef<Hls | null>(null);
   const recoverCountRef = useRef(0);
   const { trace, requestSeek } = usePlayerDiagnostics(videoRef, hlsRef, { view: "post_detail", ...diagnosticContext, active, resource: mediaResource(src) });
-  const activity = usePlaybackActivity(videoRef, hlsRef, { active, autoPlay: !!autoPlay, src, trace });
+  const activity = usePlaybackActivity(videoRef, hlsRef, { active, autoPlay: !!autoPlay, src, trace,
+    onPlayRejected: (source, name) => setErrMsg(`play() 被拒 ${name}（${source}）`) });
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [time, setTime] = useState(0);
@@ -131,10 +132,10 @@ export default function Player({
         else { hls.destroy(); hlsRef.current = null; }
       });
     } else {
-  // Safari / 部分 WebView 原生支持 HLS：直接给源站地址（同 VideoSurface）。
-  video.src = /^https?:\/\//i.test(src) ? src : url;
-  if (autoPlay) activity.play("native_autoplay", true);
-}
+      // Safari / 部分 WebView 原生支持 HLS：直接给源站地址（同 VideoSurface）。
+      video.src = /^https?:\/\//i.test(src) ? src : url;
+      if (autoPlay) activity.play("native_autoplay", true);
+    }
 
     return () => {
       trace("source.cleanup");
@@ -199,6 +200,14 @@ export default function Player({
         onSeeked={() => setWaiting(false)}
         onTimeUpdate={(e) => setTime((e.target as HTMLVideoElement).currentTime)}
         onLoadedMetadata={(e) => setDuration((e.target as HTMLVideoElement).duration || 0)}
+        onError={(e) => {
+          // 诊断用：原生播放器加载失败以前是静默的，code: 1=中断 2=网络 3=解码 4=地址不支持
+          const v = e.target as HTMLVideoElement;
+          const code = v.error?.code;
+          if (code && code !== 1) {
+            setErrMsg(`原生加载失败 code=${code}${v.error?.message ? ` ${v.error.message}` : ""}`);
+          }
+        }}
         onEnded={() => { if (activity.isActive()) onEnded?.(); }}
       />
 
