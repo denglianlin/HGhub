@@ -1,5 +1,6 @@
 mod api;
 mod lines;
+mod local_proxy;
 mod logging;
 #[cfg(target_os = "macos")]
 mod macos_titlebar;
@@ -167,6 +168,7 @@ pub fn run() {
             api::api_like,
             api::api_collect,
             api::api_follow,
+            local_proxy::proxy_play_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
